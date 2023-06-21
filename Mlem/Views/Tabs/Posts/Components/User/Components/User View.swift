@@ -27,7 +27,48 @@ struct UserView: View {
     
     @State private var errorAlert: ErrorAlert?
     
-    @State private var selectionSection = 1
+    @State private var selectionSection = 0
+    
+    enum FeedType : String, CaseIterable, Identifiable {
+        case Overview = "Overview"
+        case Comments = "Comments"
+        case Posts = "Posts"
+        case Saved = "Saved"
+        
+        var id: String { return self.rawValue }
+    }
+    
+    struct PostFeedItem {
+        let account: SavedAccount
+        let post: APIPostView
+        
+        @ViewBuilder
+        func view() -> some View {
+            NavigationLink {
+                ExpandedPost(account: account , post: post, feedType: .constant(.subscribed))
+            } label: {
+                FeedPost(post: post, account: account, feedType: .constant(.subscribed))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+    
+    struct CommentFeedItem {
+        let account: SavedAccount
+        let comment: HierarchicalComment
+        
+        @ViewBuilder
+        func view() -> some View {
+            CommentItem(account: account, hierarchicalComment: comment)
+        }
+    }
+    
+    struct FeedItem : Identifiable {
+        let id = UUID()
+        let published: Date
+        let comment: CommentFeedItem?
+        let post: PostFeedItem?
+    }
     
     var body: some View {
         contentView
@@ -107,24 +148,48 @@ struct UserView: View {
                     if let bio = userDetails.person.bio {
                         MarkdownView(text: bio).padding()
                     }
-                    
-                    Picker(selection: $selectionSection, label: Text("Profile Section")) {
-                        Text("Overview").tag(1)
-                        Text("Comments").tag(2)
-                        Text("Posts").tag(3)
-                        
-                        // Only show saved posts if we are
-                        // browsing our own profile
-                        if userID == account.id {
-                            Text("Saved").tag(4)
-                        }
-                        
-                    }
-                    .pickerStyle(.segmented)
                 }.frame(maxWidth: .infinity)
             }
+            
+            Picker(selection: $selectionSection, label: Text("Profile Section")) {
+                Text(FeedType.Overview.rawValue).tag(0)
+                Text(FeedType.Comments.rawValue).tag(1)
+                Text(FeedType.Posts.rawValue).tag(2)
+
+                // Only show saved posts if we are
+                // browsing our own profile
+                if userID == account.id {
+                    Text(FeedType.Saved.rawValue).tag(3)
+                }
+                
+            }
+            .pickerStyle(.segmented)
            
-            if selectionSection == 1 {
+            if selectionSection == 0 {
+                LazyVStack {
+                    ForEach(generateMixedFeed())
+                    { feedItem in
+                        
+                        if let comment = feedItem.comment {
+                            comment.view()
+                        }
+                        else if let post = feedItem.post {
+                            post.view()
+                        }
+                        Spacer().frame(height: 8)
+                    }
+                }.background(Color.secondarySystemBackground)
+            }
+            else if selectionSection == 1 {
+                LazyVStack {
+                    ForEach(privateCommentTracker.comments)
+                    { comment in
+                        CommentItem(account: account, hierarchicalComment: comment)
+                        Spacer().frame(height: 8)
+                    }
+                }.background(Color.secondarySystemBackground)
+            }
+            else if selectionSection == 2 {
                 LazyVStack {
                     ForEach(privatePostTracker.posts)
                     { post in
@@ -134,13 +199,35 @@ struct UserView: View {
                             FeedPost(post: post, account: account, feedType: .constant(.subscribed))
                         }
                         .buttonStyle(.plain)
+                        Spacer().frame(height: 8)
                     }
-                }
+                }.background(Color.secondarySystemBackground)
             }
         }
         .navigationTitle(userDetails.person.name)
         .navigationBarTitleDisplayMode(.inline)
         .headerProminence(.standard)
+    }
+    
+    private func generateMixedFeed() -> [FeedItem] {
+        var result: [FeedItem] = []
+        
+        // Add comments
+        result.append(contentsOf: privateCommentTracker.comments.map({
+            return FeedItem(published: $0.commentView.comment.published, comment: CommentFeedItem(account: account, comment: $0), post: nil)
+        }))
+        
+        // Add posts
+        result.append(contentsOf: privatePostTracker.posts.map({
+            return FeedItem(published: $0.post.published, comment: nil, post: PostFeedItem(account: account, post: $0))
+        }))
+        
+        // Sort by authored date, newest first
+        result = result.sorted(by: {
+            $0.published > $1.published
+        })
+        
+        return result;
     }
     
     private var progressView: some View {
