@@ -47,7 +47,7 @@ struct UserView: View {
             NavigationLink {
                 ExpandedPost(account: account , post: post, feedType: .constant(.subscribed))
             } label: {
-                FeedPost(post: post, account: account, feedType: .constant(.subscribed))
+                FeedPost(postView: post, account: account, feedType: .constant(.subscribed))
             }
             .buttonStyle(.plain)
         }
@@ -59,7 +59,7 @@ struct UserView: View {
         
         @ViewBuilder
         func view() -> some View {
-            CommentItem(account: account, hierarchicalComment: comment)
+            CommentItem(account: account, hierarchicalComment: comment, embedPost: true)
         }
     }
     
@@ -184,7 +184,7 @@ struct UserView: View {
                 LazyVStack {
                     ForEach(privateCommentTracker.comments)
                     { comment in
-                        CommentItem(account: account, hierarchicalComment: comment)
+                        CommentItem(account: account, hierarchicalComment: comment, embedPost: true)
                         Spacer().frame(height: 8)
                     }
                 }.background(Color.secondarySystemBackground)
@@ -196,7 +196,7 @@ struct UserView: View {
                         NavigationLink {
                             ExpandedPost(account: account , post: post, feedType: .constant(.subscribed))
                         } label: {
-                            FeedPost(post: post, account: account, feedType: .constant(.subscribed))
+                            FeedPost(postView: post, account: account, feedType: .constant(.subscribed))
                         }
                         .buttonStyle(.plain)
                         Spacer().frame(height: 8)
@@ -292,7 +292,7 @@ struct UserViewPreview : PreviewProvider {
     }
     
     static func generatePreviewUser(name: String, displayName: String, userType: PreviewUserType) -> APIPerson {
-        return APIPerson(id: name.hashValue, name: name, displayName: displayName, avatar: URL(string: "https://lemmy.ml/pictrs/image/df86c06d-341c-4e79-9c80-d7c7eb64967a.jpeg?format=webp"), banned: false, published: "idk", updated: nil, actorId: userType == .Dev ? URL(string: "http://\(UserProfileLink.developerNames[0])")! : URL(string: "https://google.com")!, bio: "Just here for the good vibes!", local: false, banner: URL(string: "https://i.imgur.com/wcayaCB.jpeg"), deleted: false, inboxUrl: URL(string: "google.com")!, sharedInboxUrl: nil, matrixUserId: nil, admin: userType == .Admin, botAccount: userType == .Bot, banExpires: nil, instanceId: 123)
+        return APIPerson(id: name.hashValue, name: name, displayName: displayName, avatar: URL(string: "https://lemmy.ml/pictrs/image/df86c06d-341c-4e79-9c80-d7c7eb64967a.jpeg?format=webp"), banned: false, published: "idk", updated: nil, actorId: URL(string: "https://google.com")!, bio: "Just here for the good vibes!", local: false, banner: URL(string: "https://i.imgur.com/wcayaCB.jpeg"), deleted: false, inboxUrl: URL(string: "google.com")!, sharedInboxUrl: nil, matrixUserId: nil, admin: userType == .Admin, botAccount: userType == .Bot, banExpires: nil, instanceId: 123)
     }
     
     static func generatePreviewComment(creator: APIPerson, isMod: Bool) -> APIComment {
@@ -327,7 +327,7 @@ struct UserViewPreview : PreviewProvider {
             postContext = generatePreviewPost(creator: previewUser)
         }
         
-        return UserProfileLink(account: UserProfileLinkPreview.previewAccount, user: previewUser, postContext: postContext, commentContext: commentContext)
+        return UserProfileLink(account: UserViewPreview.previewAccount, user: previewUser)
     }
     
     static var previews: some View {

@@ -21,6 +21,7 @@ struct CommentItem: View
     // like if the person is OP or not
     @State var post: APIPostView? = nil
     
+    @State var embedPost = false;
     @State var isCollapsed = false
     
     @State private var isShowingTextSelectionSheet: Bool = false
@@ -67,6 +68,18 @@ struct CommentItem: View
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
+                }
+            }
+            
+            if embedPost {
+                NavigationLink(destination: ExpandedPost(account: account , post: APIPostView(post: hierarchicalComment.commentView.post, creator: hierarchicalComment.commentView.creator, community: hierarchicalComment.commentView.community, creatorBannedFromCommunity: false, counts: APIPostAggregates(id: 0, postId: 0, comments: 0, score: 0, upvotes: 0, downvotes: 0, published: Date.now, newestCommentTime: Date.now, newestCommentTimeNecro: Date.now, featuredCommunity: false, featuredLocal: false), subscribed: .notSubscribed, saved: false, read: false, creatorBlocked: false, unreadComments: 0), feedType: .constant(.subscribed)))
+                {
+                    VStack(alignment: .leading) {
+                        Text(hierarchicalComment.commentView.post.embedTitle ?? hierarchicalComment.commentView.post.name).foregroundColor(.gray).bold().font(.subheadline)
+                        Spacer().frame(height: 10)
+                        Text(hierarchicalComment.commentView.community.name).font(.footnote).foregroundColor(.gray)
+                    }.padding().background(Rectangle().foregroundColor(Color.secondarySystemBackground).cornerRadius(5))
+                    
                 }
             }
 
