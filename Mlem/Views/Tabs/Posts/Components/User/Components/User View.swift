@@ -27,6 +27,8 @@ struct UserView: View {
     
     @State private var errorAlert: ErrorAlert?
     
+    @State private var selectionSection = 1
+    
     var body: some View {
         contentView
             .alert(using: $errorAlert) { content in
@@ -45,102 +47,96 @@ struct UserView: View {
     }
     
     private func view(for userDetails: APIPersonView) -> some View {
-        ZStack {
-            VStack {
-                if let bannerUrl = userDetails.person.banner {
-                    CachedAsyncImage(url: bannerUrl) { image in
-                        image
-                            .resizable()
-                            .frame(width: .infinity, height: 200)
-                    } placeholder: {
-                        ProgressView()
-                    }
-                }
-                Spacer()
-            }
-            VStack() {
-               
-                HStack {
-                    VStack(alignment: .leading) {
-                        Rectangle().frame(width: .infinity, height: 70).opacity(0.0)
-                        if let avatarURL = userDetails.person.avatar {
-                            CachedAsyncImage(url: avatarURL) { image in
-                                image
-                                    .resizable()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                                    .overlay(Circle()
-                                        .stroke(.white, lineWidth: 1))
-                            } placeholder: {
-                                ProgressView()
-                            }
+        ScrollView {
+            ZStack {
+                // Banner
+                VStack {
+                    if let bannerUrl = userDetails.person.banner {
+                        CachedAsyncImage(url: bannerUrl) { image in
+                            image
+                                .resizable()
+                                .frame(height: 200)
+                        } placeholder: {
+                            ProgressView()
                         }
-                        
-                    }.padding(10)
+                    }
                     Spacer()
-                    VStack(alignment: .trailing) {
-                        HStack {
-                            Text("20 Comments").foregroundColor(.white).background(RoundedRectangle(cornerRadius: 5).foregroundColor(.gray)).font(.footnote)
-                            Text("30 Posts").foregroundColor(.white).background(RoundedRectangle(cornerRadius: 5).foregroundColor(.gray)).font(.footnote)
-                        }.padding(EdgeInsets(top: 160, leading: 0, bottom: 10, trailing: 0))
-                        Text(userDetails.person.name).font(.title)
-                        Text("@\(userDetails.person.name)@\(userDetails.person.actorId.host()!)").font(.title3)
-                    }.padding(10)
                 }
-                if let bio = userDetails.person.bio {
-                    MarkdownView(text: bio)
-                }
-                
-                HStack(alignment: .center, spacing: 20) {
-                    VStack(alignment: .center, spacing: 2) {
-                        Text(String(userDetails.counts.commentScore))
-                            .fontWeight(.bold)
-                        Text("Comment\nScore")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                VStack {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading) {
+                            Spacer().frame(height: 110)
+                            if let avatarURL = userDetails.person.avatar {
+                                CachedAsyncImage(url: avatarURL) { image in
+                                    image
+                                        .resizable()
+                                        .frame(width: 120, height: 120)
+                                        .clipShape(Circle())
+                                        .shadow(radius: 10)
+                                        .overlay(Circle()
+                                            .stroke(.background, lineWidth: 2))
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                            } else {
+                                Spacer().frame(height: 120) // TODO: Show blank avatar
+                            }
+                            HStack {
+                                Image(systemName: "birthday.cake.fill")
+                                Text("Joined 2y ago")
+                            }.foregroundColor(.gray)
+                            
+                        }.padding([.leading])
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing) {
+                            Spacer().frame(height: 170)
+                            HStack {
+                                Text("20 Comments").padding(3).foregroundColor(.white).background(RoundedRectangle(cornerRadius: 5).foregroundColor(.gray)).font(.footnote)
+                                Text("30 Posts").padding(3).foregroundColor(.white).background(RoundedRectangle(cornerRadius: 5).foregroundColor(.gray)).font(.footnote)
+                            }
+                            Spacer().frame(height: 20)
+                            
+                            Text(userDetails.person.name).font(.title).bold()
+                            Text("@\(userDetails.person.name)@\(userDetails.person.actorId.host()!)").font(.footnote)
+                            
+                        }.padding([.trailing])
                     }
                     
-                    VStack(alignment: .center, spacing: 2) {
-                        Text(String(userDetails.counts.postScore))
-                            .fontWeight(.bold)
-                        Text("Post\nScore")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                    if let bio = userDetails.person.bio {
+                        MarkdownView(text: bio).padding()
+                    }
+                    
+                    Picker(selection: $selectionSection, label: Text("Profile Section")) {
+                        Text("Overview").tag(1)
+                        Text("Comments").tag(2)
+                        Text("Posts").tag(3)
+                        
+                        // Only show saved posts if we are
+                        // browsing our own profile
+                        if userID == account.id {
+                            Text("Saved").tag(4)
+                        }
+                        
+                    }
+                    .pickerStyle(.segmented)
+                }.frame(maxWidth: .infinity)
+            }
+           
+            if selectionSection == 1 {
+                LazyVStack {
+                    ForEach(privatePostTracker.posts)
+                    { post in
+                        NavigationLink {
+                            ExpandedPost(account: account , post: post, feedType: .constant(.subscribed))
+                        } label: {
+                            FeedPost(post: post, account: account, feedType: .constant(.subscribed))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                Spacer()
-            }.frame(maxWidth: .infinity)
-            
-            
-#warning("TODO: Make showing a user's posts and comments work")
-            /*
-             Section
-             {
-             NavigationLink {
-             ScrollView
-             {
-             LazyVStack {
-             ForEach(privatePostTracker.posts)
-             { post in
-             NavigationLink {
-             PostExpanded(account: account, postTracker: privatePostTracker, post: post, feedType: .constant(.subscribed))
-             } label: {
-             PostItem(postTracker: privatePostTracker, post: post, isExpanded: false, isInSpecificCommunity: false, account: account, feedType: .constant(.subscribed))
-             }
-             .buttonStyle(.plain)
-             }
-             }
-             }
-             .navigationTitle("Recents by \(userDetails.name)")
-             .navigationBarTitleDisplayMode(.inline)
-             } label: {
-             Text("Recent Posts")
-             }
-             
-             }
-             */
+            }
         }
         .navigationTitle(userDetails.person.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -209,7 +205,7 @@ struct UserViewPreview : PreviewProvider {
     }
     
     static func generatePreviewUser(name: String, displayName: String, userType: PreviewUserType) -> APIPerson {
-        return APIPerson(id: name.hashValue, name: name, displayName: displayName, avatar: URL(string: "https://lemmy.ml/pictrs/image/df86c06d-341c-4e79-9c80-d7c7eb64967a.jpeg?format=webp"), banned: false, published: "idk", updated: nil, actorId: userType == .Dev ? URL(string: "http://\(UserProfileLink.developerNames[0])")! : URL(string: "https://google.com")!, bio: nil, local: false, banner: URL(string: "https://i.imgur.com/wcayaCB.jpeg"), deleted: false, inboxUrl: URL(string: "google.com")!, sharedInboxUrl: nil, matrixUserId: nil, admin: userType == .Admin, botAccount: userType == .Bot, banExpires: nil, instanceId: 123)
+        return APIPerson(id: name.hashValue, name: name, displayName: displayName, avatar: URL(string: "https://lemmy.ml/pictrs/image/df86c06d-341c-4e79-9c80-d7c7eb64967a.jpeg?format=webp"), banned: false, published: "idk", updated: nil, actorId: userType == .Dev ? URL(string: "http://\(UserProfileLink.developerNames[0])")! : URL(string: "https://google.com")!, bio: "Just here for the good vibes!", local: false, banner: URL(string: "https://i.imgur.com/wcayaCB.jpeg"), deleted: false, inboxUrl: URL(string: "google.com")!, sharedInboxUrl: nil, matrixUserId: nil, admin: userType == .Admin, botAccount: userType == .Bot, banExpires: nil, instanceId: 123)
     }
     
     static func generatePreviewComment(creator: APIPerson, isMod: Bool) -> APIComment {
@@ -248,6 +244,6 @@ struct UserViewPreview : PreviewProvider {
     }
     
     static var previews: some View {
-        UserView(userID: 123, account: previewAccount, userDetails: APIPersonView(person: generatePreviewUser(name: "Dave", displayName: "Dave", userType: .Normal), counts: APIPersonAggregates(id: 123, personId: 123, postCount: 123, postScore: 567, commentCount: 14, commentScore: 974)))
+        UserView(userID: 123, account: previewAccount, userDetails: APIPersonView(person: generatePreviewUser(name: "actualUsername", displayName: "PreferredUsername", userType: .Normal), counts: APIPersonAggregates(id: 123, personId: 123, postCount: 123, postScore: 567, commentCount: 14, commentScore: 974)))
     }
 }
