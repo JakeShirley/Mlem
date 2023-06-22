@@ -59,7 +59,12 @@ struct UserView: View {
         
         @ViewBuilder
         func view() -> some View {
-            CommentItem(account: account, hierarchicalComment: comment, embedPost: true)
+            VStack {
+                HStack {
+                    CommentItem(account: account, hierarchicalComment: comment, embedPost: true).padding(.vertical)
+                    Spacer()
+                }
+            }.background(Color.systemBackground)
         }
     }
     
@@ -89,66 +94,17 @@ struct UserView: View {
     
     private func view(for userDetails: APIPersonView) -> some View {
         ScrollView {
-            ZStack {
-                // Banner
-                VStack {
-                    if let bannerUrl = userDetails.person.banner {
-                        CachedAsyncImage(url: bannerUrl) { image in
-                            image
-                                .resizable()
-                                .frame(height: 200)
-                        } placeholder: {
-                            ProgressView()
-                        }
-                    }
-                    Spacer()
-                }
-                VStack {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading) {
-                            Spacer().frame(height: 110)
-                            if let avatarURL = userDetails.person.avatar {
-                                CachedAsyncImage(url: avatarURL) { image in
-                                    image
-                                        .resizable()
-                                        .frame(width: 120, height: 120)
-                                        .clipShape(Circle())
-                                        .shadow(radius: 10)
-                                        .overlay(Circle()
-                                            .stroke(.background, lineWidth: 2))
-                                } placeholder: {
-                                    ProgressView()
-                                }
-                            } else {
-                                Spacer().frame(height: 120) // TODO: Show blank avatar
-                            }
-                            HStack {
-                                Image(systemName: "birthday.cake.fill")
-                                Text("Joined 2y ago")
-                            }.foregroundColor(.gray)
-                            
-                        }.padding([.leading])
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing) {
-                            Spacer().frame(height: 170)
-                            HStack {
-                                Text("20 Comments").padding(3).foregroundColor(.white).background(RoundedRectangle(cornerRadius: 5).foregroundColor(.gray)).font(.footnote)
-                                Text("30 Posts").padding(3).foregroundColor(.white).background(RoundedRectangle(cornerRadius: 5).foregroundColor(.gray)).font(.footnote)
-                            }
-                            Spacer().frame(height: 20)
-                            
-                            Text(userDetails.person.name).font(.title).bold()
-                            Text("@\(userDetails.person.name)@\(userDetails.person.actorId.host()!)").font(.footnote)
-                            
-                        }.padding([.trailing])
-                    }
-                    
-                    if let bio = userDetails.person.bio {
-                        MarkdownView(text: bio).padding()
-                    }
-                }.frame(maxWidth: .infinity)
+            CommunitySidebarHeader(
+                title: userDetails.person.name,
+                subtitle: "@\(userDetails.person.name)@\(userDetails.person.actorId.host()!)",
+                avatarSubtext: "Joined 2y ago",
+                bannerURL: userDetails.person.banner,
+                avatarUrl: userDetails.person.avatar,
+            label1: "20 Comments",
+                label2: "20 Posts")
+            
+            if let bio = userDetails.person.bio {
+                MarkdownView(text: bio).padding()
             }
             
             Picker(selection: $selectionSection, label: Text("Profile Section")) {
@@ -164,6 +120,7 @@ struct UserView: View {
                 
             }
             .pickerStyle(.segmented)
+            .padding(.horizontal)
            
             if selectionSection == 0 {
                 LazyVStack {
@@ -184,8 +141,7 @@ struct UserView: View {
                 LazyVStack {
                     ForEach(privateCommentTracker.comments)
                     { comment in
-                        CommentItem(account: account, hierarchicalComment: comment, embedPost: true)
-                        Spacer().frame(height: 8)
+                        CommentFeedItem(account: account, comment: comment).view()
                     }
                 }.background(Color.secondarySystemBackground)
             }
@@ -202,6 +158,9 @@ struct UserView: View {
                         Spacer().frame(height: 8)
                     }
                 }.background(Color.secondarySystemBackground)
+            }
+            else if selectionSection == 3 {
+                Text("Saved post viewing not implemented yet.  Coming soon!").font(.title)
             }
         }
         .navigationTitle(userDetails.person.name)
@@ -239,7 +198,7 @@ struct UserView: View {
                 let response = try await loadUser()
                 
                 userDetails = response.personView
-                privateCommentTracker.comments = response.comments.hierarchicalRepresentation
+                privateCommentTracker.comments = response.comments.hierarchicalRepresentation.sorted(by: { $0.commentView.comment.published > $1.commentView.comment.published})
                 privatePostTracker.add(response.posts)
             } catch {
                 handle(error)
