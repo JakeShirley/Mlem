@@ -32,10 +32,25 @@ struct CommunitySidebarView: View {
         }
     }
     
+    private func getRelativeTime(date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        
+        return formatter.localizedString(for: date, relativeTo: Date.now)
+    }
+    
     @ViewBuilder
     private func view(for communityDetails: GetCommunityResponse) -> some View {
         ScrollView {
-            CommunitySidebarHeader(communityDetails: communityDetails)
+            CommunitySidebarHeader(
+                title: communityDetails.communityView.community.name,
+                subtitle: "@\(communityDetails.communityView.community.name)@\(communityDetails.communityView.community.actorId.host()!)",
+                avatarSubtext: "Created \(getRelativeTime(date: communityDetails.communityView.community.published))",
+                bannerURL: communityDetails.communityView.community.banner,
+                avatarUrl: communityDetails.communityView.community.icon,
+            label1: "\(communityDetails.communityView.counts.subscribers) Subscribers",
+            label2: "\(communityDetails.online) Online")
+            
             Picker(selection: $selectionSection, label: Text("Profile Section")) {
                 Text("Description").tag(0)
                 Text("Moderators").tag(1)
