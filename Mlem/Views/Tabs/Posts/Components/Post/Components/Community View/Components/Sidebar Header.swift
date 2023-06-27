@@ -81,6 +81,22 @@ struct CommunitySidebarHeader : View {
             }
         }
     }
+    
+    private var privateMessageButton: some View {
+        Button {
+            
+        } label: {
+            Image(systemName: "envelope.fill")
+                .resizable()
+                .foregroundColor(.white)
+                .opacity(0.75)
+                .background(Rectangle()
+                        .foregroundColor(.gray)
+                        .cornerRadius(2))
+                .border(.black)
+                .frame(width: 40, height: 26)
+        }.padding(.vertical)
+    }
 }
 
 struct SidebarHeaderPreview: PreviewProvider {

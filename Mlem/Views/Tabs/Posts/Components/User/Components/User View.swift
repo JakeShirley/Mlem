@@ -23,6 +23,7 @@ struct UserView: View {
     @State var userID: Int
     @State var account: SavedAccount
     @State var userDetails: APIPersonView?
+    @State var moderatedCommunities: [APICommunityModeratorView] = []
 
     // members
     @State private var errorAlert: ErrorAlert?
@@ -66,6 +67,62 @@ struct UserView: View {
         } else {
             progressView
         }
+    }
+    
+    private var moderatorButton: some View {
+        Button {
+            
+        } label: {
+            Image(systemName: "shield.fill")
+                .resizable()
+                .foregroundColor(.green)
+                .frame(width: 34, height: 40)
+                .background(Image(systemName: "shield")
+                    .resizable()
+                    .foregroundColor(.white)
+                    .frame(width: 38, height: 44))
+        }.padding()
+    }
+    
+    private var elipseMenu: some View {
+        Menu {
+            Button() { } label: {
+                HStack {
+                    Text("Block")
+                    Image(systemName: "eye.slash")
+                }
+            }
+            Button() { } label: {
+                HStack {
+                    Text("Unblock")
+                    Image(systemName: "eye")
+                }
+            }
+            Button() { } label: {
+                HStack {
+                    Text("Report")
+                    Image(systemName: "exclamationmark.bubble")
+                }
+            }
+            Button() { } label: {
+                HStack {
+                    Text("Message")
+                    Image(systemName: "envelope")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .frame(width: 20, height: 20)
+                .foregroundColor(.white)
+                .shadow(radius: 10)
+                .background(RoundedRectangle(cornerRadius: 4)
+                    .aspectRatio(1, contentMode: .fit)
+                    .foregroundColor(.clear)
+                )
+                
+        }
+        .onTapGesture { }
+        .padding()// allows menu to pop up on first tap
     }
     
     private func view(for userDetails: APIPersonView) -> some View {
@@ -337,6 +394,7 @@ struct UserView: View {
             }
             
             userDetails = authoredContent.personView
+            moderatedCommunities = authoredContent.moderates
             updateAvatarSubtext()
         } catch {
             handle(error)
