@@ -1,9 +1,10 @@
 //
-//  GetPersonDetailsRequest.swift
+//  GetPersonComments.swift
 //  Mlem
 //
-//  Created by Nicholas Lawson on 09/06/2023.
+//  Created by Jake Shirley on 6/30/23.
 //
+
 
 import Foundation
 

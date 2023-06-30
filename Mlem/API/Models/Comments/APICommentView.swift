@@ -32,3 +32,10 @@ extension APICommentView: Equatable {
         lhs.comment.id == rhs.comment.id
     }
 }
+
+// MARK: - FeedTrackerItem
+
+extension APICommentView: FeedTrackerItem {
+    var uniqueIdentifier: some Hashable { id }
+    var published: Date { comment.published }
+}

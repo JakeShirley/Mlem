@@ -40,8 +40,7 @@ extension UserView {
     
     private func loadUser(savedItems: Bool) async throws -> GetPersonDetailsResponse {
         let request = try GetPersonDetailsRequest(
-            accessToken: account.accessToken,
-            instanceURL: account.instanceLink,
+            account: account,
             limit: 20, // TODO: Stream pages
             savedOnly: savedItems,
             personId: userID
