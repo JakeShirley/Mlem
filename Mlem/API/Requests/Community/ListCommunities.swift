@@ -9,7 +9,7 @@ import Foundation
 
 // lemmy_api_common::community::ListCommunities
 struct ListCommunitiesRequest: APIGetRequest {
-
+commucom
     typealias Response = ListCommunityResponse
 
     let instanceURL: URL
