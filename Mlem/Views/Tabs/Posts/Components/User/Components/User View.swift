@@ -8,6 +8,68 @@
 import CachedAsyncImage
 import SwiftUI
 
+struct UserElipseMenu: View {
+    // paremeters
+    @State var account: SavedAccount
+    @State var userDetails: APIPersonView
+    @Binding var isBlocked: Bool
+    
+    var body: some View {
+        Menu {
+            Button {
+                Task {
+                    await blockUser(shouldBlock: !isBlocked)
+                }
+            } label: {
+                HStack {
+                    
+                    if isBlocked {
+                        Text("Unblock")
+                        Image(systemName: "eye")
+                    } else {
+                        Text("Block")
+                        Image(systemName: "eye.slash")
+                    }
+                }
+            }
+            Button { } label: {
+                HStack {
+                    Text("Report")
+                    Image(systemName: "exclamationmark.bubble")
+                }
+            }
+            Button { } label: {
+                HStack {
+                    Text("Private Message")
+                    Image(systemName: "envelope")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .frame(width: 20, height: 20)
+                .foregroundColor(.white)
+                .shadow(radius: 10)
+                .background(RoundedRectangle(cornerRadius: 4)
+                    .aspectRatio(1, contentMode: .fit)
+                    .foregroundColor(.clear)
+                )
+            
+        }
+        .onTapGesture { }
+        .padding()// allows menu to pop up on first tap
+    }
+    
+    private func blockUser(shouldBlock: Bool) async {
+        do {
+            let request = BlockPersonRequest(account: account, person: userDetails.person, block: shouldBlock)
+            
+            try await APIClient().perform(request: request)
+        } catch {
+            print("Failed to block user: \(error)")
+        }
+    }
+}
+
 // swiftlint:disable file_length
 // swiftlint:disable type_body_length
 
@@ -32,7 +94,9 @@ struct UserView: View {
     @StateObject private var privatePostTracker: PostTracker = .init(shouldPerformMergeSorting: false)
     @StateObject private var privateCommentTracker: CommentTracker = .init()
     @State private var avatarSubtext: String = ""
-    @State var showingCakeDay = false
+    @State private var showingCakeDay = false
+    @State private var moderatedCommunities: [APICommunityModeratorView] = []
+    @State private var isUserBlocked = false
     
     @State private var selectionSection = 0
     @State var isDragging: Bool = false
@@ -69,18 +133,51 @@ struct UserView: View {
             progressView
         }
     }
+    
+    private var moderatorButton: some View {
+           Button {
+
+           } label: {
+               Image(systemName: "shield.fill")
+                   .resizable()
+                   .foregroundColor(.green)
+                   .frame(width: 34, height: 40)
+                   .background(Image(systemName: "shield")
+                       .resizable()
+                       .foregroundColor(.white)
+                       .frame(width: 38, height: 44))
+           }.padding()
+       }
+    
+    private var elipseMenu: some View {
+        HStack {
+            if let user = userDetails {
+                if !moderatedCommunities.isEmpty {
+                    Spacer()
+                    VStack {
+                        UserElipseMenu(account: account, userDetails: user, isBlocked: $isUserBlocked)
+                        Spacer()
+                    }
+                }
+            }
+        }
+    }
 
     private func view(for userDetails: APIPersonView) -> some View {
         ScrollView {
-            CommunitySidebarHeader(
-                title: userDetails.person.displayName ?? userDetails.person.name,
-                subtitle: "@\(userDetails.person.name)@\(userDetails.person.actorId.host()!)",
-                avatarSubtext: $avatarSubtext,
-                avatarSubtextClicked: self.toggleCakeDayVisible,
-                bannerURL: shouldShowUserHeaders ? userDetails.person.banner : nil,
-                avatarUrl: userDetails.person.avatar,
-                label1: "\(userDetails.counts.commentCount) Comments",
-                label2: "\(userDetails.counts.postCount) Posts")
+            ZStack {
+                CommunitySidebarHeader(
+                    title: userDetails.person.displayName ?? userDetails.person.name,
+                    subtitle: "@\(userDetails.person.name)@\(userDetails.person.actorId.host()!)",
+                    avatarSubtext: $avatarSubtext,
+                    avatarSubtextClicked: self.toggleCakeDayVisible,
+                    bannerURL: shouldShowUserHeaders ? userDetails.person.banner : nil,
+                    avatarUrl: userDetails.person.avatar,
+                    label1: "\(userDetails.counts.commentCount) Comments",
+                    label2: "\(userDetails.counts.postCount) Posts")
+                
+                elipseMenu
+            }
             
             if let bio = userDetails.person.bio {
                 MarkdownView(text: bio, isNsfw: false).padding()
@@ -138,6 +235,26 @@ struct UserView: View {
         } else {
             avatarSubtext = ""
         }
+    }
+    
+    // Tries to deduce blocked state from posts
+    // because there is no direct way to see if we are blocking someone
+    private func updatedBlockedState() {
+        var isBlocked = false
+        
+        for post in privatePostTracker.items where post.creatorBlocked {
+            isBlocked = true
+            break
+        }
+        
+        if !isBlocked {
+            for comment in privateCommentTracker.comments where comment.commentView.creatorBlocked {
+                isBlocked = true
+                break
+            }
+        }
+        
+        isUserBlocked = isBlocked
     }
     
     private func toggleCakeDayVisible() {
@@ -326,7 +443,9 @@ struct UserView: View {
             }
             
             userDetails = authoredContent.personView
+            moderatedCommunities = authoredContent.moderates
             updateAvatarSubtext()
+            updatedBlockedState()
         } catch {
             handle(error)
         }

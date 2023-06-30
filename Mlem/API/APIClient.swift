@@ -33,7 +33,12 @@ class APIClient {
 
         let urlRequest = try urlRequest(from: request)
         let (data, response) = try await execute(urlRequest)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            print("statusCode: \(httpResponse.statusCode)")
+        }
 
+        print("Response: \(String(decoding: data, as: UTF8.self))")
         if let apiError = try? decoder.decode(APIErrorResponse.self, from: data) {
             // at present we have a single error model which appears to be used throughout
             // the API, however we may way to consider adding the error model type as an
