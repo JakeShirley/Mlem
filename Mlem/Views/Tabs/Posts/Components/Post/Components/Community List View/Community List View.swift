@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+// swiftlint:disable file_length
 struct CommunitySection: Identifiable {
     let id = UUID()
     let viewId: String
@@ -19,7 +20,8 @@ struct CommunityListView: View {
     let account: SavedAccount
     @EnvironmentObject var favoritedCommunitiesTracker: FavoriteCommunitiesTracker
 
-    @State var subscribedCommunities = [APICommunity]()
+    @State var subscribedCommunities: [APICommunity] = []
+    @State var moderatedCommunities: [APICommunity] = []
 
     private var hasTestCommunities = false
 
@@ -71,8 +73,11 @@ struct CommunityListView: View {
                         ForEach(calculateVisibleCommunitySections()) { communitySection in
                             Section(header:
                                         HStack {
-                                Text(communitySection.inlineHeaderLabel!).accessibilityLabel(communitySection.accessibilityLabel)
+                                Text(communitySection.inlineHeaderLabel!)
+                                    .bold()
+                                    .accessibilityLabel(communitySection.accessibilityLabel)
                                 Spacer()
+                                
                             }.id(communitySection.viewId)) {
                                 ForEach(calculateCommunityListSections(for: communitySection)
                                 ) { listedCommunity in
@@ -85,7 +90,7 @@ struct CommunityListView: View {
                                 }
                             }
                         }
-
+                        
                     }
                     .navigationTitle("Communities")
                     .listStyle(PlainListStyle())
@@ -96,12 +101,14 @@ struct CommunityListView: View {
             }
         }
         .refreshable {
+            await refreshModeratedList()
             await refreshCommunitiesList()
         }
         .task(priority: .userInitiated) {
             // NOTE: This will not auto request if data is provided
             // This is normally only during preview
             if hasTestCommunities == false {
+                await refreshModeratedList()
                 await refreshCommunitiesList()
             }
 
@@ -128,6 +135,16 @@ struct CommunityListView: View {
                     ),
                     inlineHeaderLabel: "Favorites",
                     accessibilityLabel: "Favorited Communities"
+                ),
+                CommunitySection(
+                    viewId: "moderated",
+                    sidebarEntry: ModeratedSidebarEntry(
+                        account: account,
+                        sidebarLabel: nil,
+                        sidebarIcon: "shield.fill"
+                    ),
+                    inlineHeaderLabel: "Moderated",
+                    accessibilityLabel: "Moderated Communities"
                 )
             ] +
             CommunityListView.alphabet.map {
@@ -191,11 +208,48 @@ struct CommunityListView: View {
         }
     }
 
+    private func refreshModeratedList() async {
+        let communitiesRequestCount = 50
+        do {
+            var moreCommunities = true
+            var refreshedCommunities: [APICommunity] = []
+            var communitiesPage = 1
+            repeat {
+                let request = try GetPersonDetailsRequest(
+                    accessToken: account.accessToken,
+                    instanceURL: account.instanceLink,
+                    limit: communitiesRequestCount,
+                    personId: account.id)
+                let response = try await APIClient().perform(request: request)
+                
+                let newSubscribedCommunities = response.moderates.map({
+                    return $0.community
+                }).sorted(by: {
+                    $0.name < $1.name
+                })
+                
+                refreshedCommunities.append(contentsOf: newSubscribedCommunities)
+                
+                communitiesPage += 1
+                
+                // Go until we get less than the count we ask for
+                moreCommunities = response.moderates.count == communitiesRequestCount
+            } while (moreCommunities)
+            
+            moderatedCommunities = refreshedCommunities.sorted(by: { $0.name < $1.name })
+        } catch {
+            print("Failed to refresh moderated communities: \(error)")
+        }
+    }
     private func calculateCommunityListSections(for section: CommunitySection) -> [APICommunity] {
         // Filter down to sidebar entry which wants us
-        return getSubscriptionsAndFavorites()
+        return getAllCommunities()
             .filter({ (listedCommunity) -> Bool in
-                section.sidebarEntry.contains(community: listedCommunity, isSubscribed: subscribedCommunities.contains(listedCommunity))
+                section.sidebarEntry.contains(
+                    community: listedCommunity,
+                    isSubscribed: subscribedCommunities.contains(listedCommunity),
+                    isModerator: moderatedCommunities.contains(listedCommunity)
+                )
             })
     }
 
@@ -204,9 +258,13 @@ struct CommunityListView: View {
 
         // Only show letter headers for letters we have in our community list
             .filter({ communitySection -> Bool in
-                getSubscriptionsAndFavorites()
+                getAllCommunities()
                     .contains(where: { communitySection.sidebarEntry
-                        .contains(community: $0, isSubscribed: subscribedCommunities.contains($0)) })
+                        .contains(
+                            community: $0,
+                            isSubscribed: subscribedCommunities.contains($0),
+                            isModerator: moderatedCommunities.contains($0)
+                        ) })
             })
         // Only show sections which have labels to show
             .filter({ (communitySection) -> Bool in
@@ -226,11 +284,14 @@ struct CommunityListView: View {
         }
     }
 
-    func getSubscriptionsAndFavorites() -> [APICommunity] {
+    func getAllCommunities() -> [APICommunity] {
         var result = subscribedCommunities
 
         // Merge in our favorites list too just incase we aren't subscribed to our favorites
         result.append(contentsOf: favoritedCommunitiesTracker.favoriteCommunities.map({ $0.community }))
+        
+        // Merge moderated communities
+        result.append(contentsOf: moderatedCommunities)
 
         // Remove duplicates and sort by name
         result = Array(Set(result)).sorted(by: { $0.name < $1.name })

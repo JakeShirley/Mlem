@@ -33,7 +33,7 @@ struct CommuntiyFeedRowView: View {
     let account: SavedAccount
     let community: APICommunity
     let subscribed: Bool
-    let communitySubscriptionChanged: (APICommunity, Bool) -> Void
+    let communitySubscriptionChanged: ((APICommunity, Bool) -> Void)?
     
     @EnvironmentObject var favoritesTracker: FavoriteCommunitiesTracker
     
@@ -114,7 +114,9 @@ struct CommuntiyFeedRowView: View {
     
     private func subscribe(communityId: Int, shouldSubscribe: Bool) async {
         // Refresh the list locally immedietly and undo it if we error
-        communitySubscriptionChanged(community, shouldSubscribe)
+        if let callback = communitySubscriptionChanged {
+            callback(community, shouldSubscribe)
+        }
         
         do {
             let request = FollowCommunityRequest(
@@ -127,7 +129,9 @@ struct CommuntiyFeedRowView: View {
         } catch {
             // TODO: If we fail here and want to notify the user we'd ideally
             print(error)
-            communitySubscriptionChanged(community, !shouldSubscribe)
+            if let callback = communitySubscriptionChanged {
+                callback(community, !shouldSubscribe)
+            }
         }
     }
 }
