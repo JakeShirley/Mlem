@@ -9,7 +9,6 @@ import CachedAsyncImage
 import SwiftUI
 
 // swiftlint:disable file_length
-// swiftlint:disable type_body_length
 
 /// View for showing user profiles
 /// Accepts the following parameters:
@@ -27,11 +26,11 @@ struct UserView: View {
     @State var account: SavedAccount
     @State var userDetails: APIPersonView?
 
-    @State private var errorAlert: ErrorAlert?
-    @StateObject private var privateCommentReplyTracker: CommentReplyTracker = .init()
-    @StateObject private var privatePostTracker: PostTracker = .init(shouldPerformMergeSorting: false)
-    @StateObject private var privateCommentTracker: CommentTracker = .init()
-    @State private var avatarSubtext: String = ""
+    @State var errorAlert: ErrorAlert?
+    @StateObject var privateCommentReplyTracker: CommentReplyTracker = .init()
+    @StateObject var privatePostTracker: PostTracker = .init(shouldPerformMergeSorting: false)
+    @StateObject var privateCommentTracker: CommentTracker = .init()
+    @State var avatarSubtext: String = ""
     @State var showingCakeDay = false
     
     @State private var selectionSection = 0
@@ -125,30 +124,6 @@ struct UserView: View {
         }
     }
     
-    private func updateAvatarSubtext() {
-        if let user = userDetails {
-            if showingCakeDay {
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "ddMMYY", options: 0, locale: Locale.current)
-                
-                avatarSubtext = "Joined \(dateFormatter.string(from: user.person.published))"
-            } else {
-                avatarSubtext = "Joined \(user.person.published.getRelativeTime(date: Date.now))"
-            }
-        } else {
-            avatarSubtext = ""
-        }
-    }
-    
-    private func toggleCakeDayVisible() {
-        showingCakeDay = !showingCakeDay
-        updateAvatarSubtext()
-    }
-    
-    private func isShowingOwnProfile() -> Bool {
-        return userID == account.id
-    }
-    
     @ViewBuilder
     private var emptyFeed: some View {
         HStack {
@@ -226,68 +201,6 @@ struct UserView: View {
         }
     }
     
-    private func generateCommentFeed(savedItems: Bool) -> [FeedItem] {
-        return privateCommentTracker.comments
-            // Matched saved state
-            .filter({
-                if savedItems {
-                    return $0.commentView.saved
-                } else {
-                    // If we un-favorited something while
-                    // here we don't want it showing up in our feed
-                    return $0.commentView.creator.id == userID
-                }
-            })
-        
-            // Create Feed Items
-            .map({
-                return FeedItem(published: $0.commentView.comment.published, comment: $0, post: nil)
-            })
-        
-            // Newest first
-            .sorted(by: {
-            $0.published > $1.published
-        })
-    }
-    
-    private func generatePostFeed(savedItems: Bool) -> [FeedItem] {
-        return privatePostTracker.items
-            // Matched saved state
-            .filter({
-                if savedItems {
-                    return $0.saved
-                } else {
-                    // If we un-favorited something while
-                    // here we don't want it showing up in our feed
-                    return $0.creator.id == userID
-                }
-            })
-        
-            // Create Feed Items
-            .map({
-                return FeedItem(published: $0.post.published, comment: nil, post: $0)
-            })
-        
-            // Newest first
-            .sorted(by: {
-            $0.published > $1.published
-        })
-    }
-    
-    private func generateMixedFeed(savedItems: Bool) -> [FeedItem] {
-        var result: [FeedItem] = []
-        
-        result.append(contentsOf: generatePostFeed(savedItems: savedItems))
-        result.append(contentsOf: generateCommentFeed(savedItems: savedItems))
-        
-        // Sort by authored date, newest first
-        result = result.sorted(by: {
-            $0.published > $1.published
-        })
-        
-        return result
-    }
-    
     @MainActor
     private var progressView: some View {
         ProgressView {
@@ -299,64 +212,6 @@ struct UserView: View {
         }
         .task(priority: .userInitiated) {
             await tryLoadUser()
-        }
-    }
-    
-    private func tryLoadUser() async {
-        do {
-            let authoredContent = try await loadUser(savedItems: false)
-            var savedContentData: GetPersonDetailsResponse?
-            if isShowingOwnProfile() {
-                savedContentData = try await loadUser(savedItems: true)
-            }
-            
-            privateCommentTracker.add(authoredContent.comments
-                .sorted(by: { $0.comment.published > $1.comment.published})
-                .map({HierarchicalComment(comment: $0, children: [])}))
-            
-            privatePostTracker.add(authoredContent.posts)
-            
-            if let savedContent = savedContentData {
-                privateCommentTracker.add(savedContent.comments
-                    .sorted(by: { $0.comment.published > $1.comment.published})
-                    .map({HierarchicalComment(comment: $0, children: [])}))
-                
-                privatePostTracker.add(savedContent.posts)
-            }
-            
-            userDetails = authoredContent.personView
-            updateAvatarSubtext()
-        } catch {
-            handle(error)
-        }
-    }
-    
-    private func loadUser(savedItems: Bool) async throws -> GetPersonDetailsResponse {
-        let request = try GetPersonDetailsRequest(
-            accessToken: account.accessToken,
-            instanceURL: account.instanceLink,
-            limit: 20, // TODO: Stream pages
-            savedOnly: savedItems,
-            personId: userID
-        )
-
-        return try await APIClient().perform(request: request)
-    }
-
-    private func handle(_ error: Error) {
-        switch error {
-        case APIClientError.response(let message, _):
-            errorAlert = .init(
-                title: "Error",
-                message: message.error
-            )
-        case is APIClientError:
-            errorAlert = .init(
-                title: "Couldn't load user info",
-                message: "There was an error while loading user information.\nTry again later."
-            )
-        default:
-            errorAlert = .unexpected
         }
     }
     
@@ -391,8 +246,6 @@ struct UserView: View {
         )
     }
 }
-
-// swiftlint:enable type_body_length
 
 // TODO: darknavi - Move these to a common area for reuse
 struct UserViewPreview: PreviewProvider {
